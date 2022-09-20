@@ -13,14 +13,17 @@ Writing packet: b'\x00\x00\x00\x00\x00\x01Z00\x02AA\x1b bTesting 1-2-3\x04'
 speak.cfg
 echo 'U2FsdGVkX19Zh5RWjqNMl5n7AkOSCCSEbdqymT2IcP6+43QNTNP9cM94ltRX2wYuCvbGGRh7WtnDN1ujedMtuXOPMJ4T1TZ61Gb64rJD2jckf7HKkzGveEs8JVZxtwbt0dUE17LWxipWxl78zzfTTwuYXcj4NJEFk7DExVJ28wzLT6FtwItR/vBfCISsHddHWZpI6E94zdVqbH2mNlrpi5f/s8tbTQKBRgPbXVmqhJBCXXvDv5I7ZsUEgC89c0di4t/hsP7q0r6Cx7gop3vn81HzRo2+XhZHP4tqHyWBw4w=' | openssl enc -aes-256-cbc -md sha512 -pbkdf2 -A -a -d
 
+
+ aplay -D sysdefault:CARD=PCH -c 2 -f S16_LE  -r 22050  data.pcm
 */
 
 import (
    "fmt"
    "net/http"
-   //"bytes"
+   "bytes"
    "context"
    "os"
+   "os/exec"
    //"encoding/json"
    "gopkg.in/yaml.v2"
 
@@ -37,6 +40,7 @@ type SpeakConfig struct {
    AccessKey string `yaml:"AccessKey"`
    BotToken string `yaml:"BotToken"`
    VerificationKey string `yaml:"VerificationKey"`
+   Port int `yaml:"Port"`
 }
 
 func hello(w http.ResponseWriter, req *http.Request) {
@@ -105,6 +109,7 @@ func speak(text string) {
 
     awscfg, err := config.LoadDefaultConfig(context.TODO(),
       // Hard coded credentials.
+      config.WithRegion("us-east-1"),
       config.WithCredentialsProvider(credentials.StaticCredentialsProvider{
         Value: aws.Credentials{
           AccessKeyID: cfg.AccessKey, SecretAccessKey: cfg.SecretKey, SessionToken: "",
@@ -126,7 +131,7 @@ func speak(text string) {
     ssin := &polly.SynthesizeSpeechInput{
       OutputFormat: pollytype.OutputFormatPcm,
       LanguageCode: pollytype.LanguageCodeEnUs,
-      TextType: pollytype.TextTypeText,
+      TextType: pollytype.TextTypeSsml,
       VoiceId: pollytype.VoiceIdJoanna,
       Engine: pollytype.EngineNeural,
       Text: &t}
@@ -134,10 +139,16 @@ func speak(text string) {
     spout, errout := p.SynthesizeSpeech(context.TODO(),ssin)
     log.Printf("Poly Speak err %s\n",errout)
     log.Printf("Poly Speak  %s\n",*spout.ContentType)
-    pcmdata := make([]byte,1024576)
-    readlen,err := spout.AudioStream.Read(pcmdata)
-    log.Printf("Poly Read  %d Bytes %s\n",readlen,err)
+    pcmdata := new(bytes.Buffer)
+    _,err = pcmdata.ReadFrom(spout.AudioStream)
+    log.Printf("Poly Read  %d Bytes %s\n",pcmdata.Len())
+
+
+    os.WriteFile("data.pcm", pcmdata.Bytes(), 0644)
     spout.AudioStream.Close()
+    cmd:= exec.Command("aplay", "-D","sysdefault:CARD=PCH","-c","1","-f","S16_LE","-r","16000")
+    cmd.Stdin = bytes.NewReader(pcmdata.Bytes())
+    cmd.Run()
 
 
 }
@@ -154,7 +165,7 @@ func main() {
     http.HandleFunc("/headers", headers)
     http.HandleFunc("/slack", slack)
 
-    log.Println("Listening")
-    speak("This is a test")
-    http.ListenAndServe(":8090", nil)
+    log.Println("Listening Port",cfg.Port)
+    speak("This is a test of the emergency broadcasting system. In the event of an actual emergency, you should put your head between your legs and kiss your ass goodbye.")
+    http.ListenAndServe(fmt.Sprintf(":%d",cfg.Port), nil)
 }
