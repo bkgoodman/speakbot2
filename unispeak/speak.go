@@ -168,7 +168,7 @@ func speak(text string) {
     //log.Printf("Poly Read  %d Bytes %s\n",pcmdata.Len())
 
 
-    os.WriteFile("data.pcm", pcmdata.Bytes(), 0644)
+    //os.WriteFile("data.pcm", pcmdata.Bytes(), 0644)
     spout.AudioStream.Close()
     cmd:= exec.Command("aplay", "-D","sysdefault:CARD=PCH","prompt.wav")
     cmd.Run()
