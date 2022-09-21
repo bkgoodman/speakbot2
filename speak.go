@@ -45,6 +45,7 @@ type SpeakConfig struct {
    SecretKey string `yaml:"SecretKey"`
    AccessKey string `yaml:"AccessKey"`
    BotToken string `yaml:"BotToken"`
+   Token string `yaml:"Token"`
    VerificationKey string `yaml:"VerificationKey"`
    Port int `yaml:"Port"`
    AlsaDevice string `yaml:"AlsaDevice"`
@@ -93,23 +94,30 @@ func slack(w http.ResponseWriter, req *http.Request) {
 
    if (req.Method == "POST") {
    		if err := req.ParseForm(); err != nil {
-			fmt.Fprintf(w, "ParseForm() err: %v", err)
+			log.Printf( "ParseForm() err: %v", err)
 			return
 		}
-		user_name := req.PostFormValue("user_name")
-		log.Printf("user_name IS %s\n",user_name)
-
-		user_id := req.PostFormValue("user_id")
-		log.Printf("user_id IS %s\n",user_id)
-
-		text := req.PostFormValue("text")
-		log.Printf("Text IS %s\n",text)
 
 		token := req.PostFormValue("token")
-		log.Printf("TOKEN IS %s\n",token)
+		//log.Printf("TOKEN IS %s\n",token)
+		if (token != cfg.Token) {
+			log.Printf("Invalid token \"%s\"",token)
+      fmt.Fprintf(w,"Invalid Token")
+      return
+    }
+		user_name := req.PostFormValue("user_name")
+		//log.Printf("user_name IS %s\n",user_name)
+
+		user_id := req.PostFormValue("user_id")
+		//log.Printf("user_id IS %s\n",user_id)
+
+		text := req.PostFormValue("text")
+		//log.Printf("Text IS %s\n",text)
 
 
-		log.Printf("FORM IS %v\n",req.Form)
+
+		//log.Printf("FORM IS %v\n",req.Form)
+    log.Printf("%s:%s: %s",user_id,user_name,text)
 
     select {
       case ch <- text:
@@ -137,11 +145,11 @@ func speak(text string) {
     }
     p := polly.NewFromConfig(awscfg)
 
-    log.Printf("CONFIG is %v+\n",cfg)
+    //log.Printf("CONFIG is %v+\n",cfg)
     input := &polly.DescribeVoicesInput{LanguageCode: "en-US"}
-    resp, err := p.DescribeVoices(context.TODO(),input)
-    log.Printf("Poly is %T %v+\n",p,p)
-    log.Printf("DescribeVoices %v is %T %v+\n",err,resp,resp)
+    _, err = p.DescribeVoices(context.TODO(),input)
+    //log.Printf("Poly is %T %v+\n",p,p)
+    //log.Printf("DescribeVoices %v is %T %v+\n",err,resp,resp)
 
     t := fmt.Sprintf("<speak><amazon:domain name=\"news\"><prosody volume=\"x-loud\" rate=\"slow\">%s</prosody></amazon:domain></speak>",text)
     ssin := &polly.SynthesizeSpeechInput{
@@ -151,13 +159,14 @@ func speak(text string) {
       VoiceId: pollytype.VoiceIdJoanna,
       Engine: pollytype.EngineNeural,
       Text: &t}
-    log.Printf(t)
+    //log.Printf(t)
     spout, errout := p.SynthesizeSpeech(context.TODO(),ssin)
-    log.Printf("Poly Speak err %s\n",errout)
-    log.Printf("Poly Speak  %s\n",*spout.ContentType)
+    if (errout != nil) {
+      log.Printf("Poly Speak err %s\n",errout)
+    }
     pcmdata := new(bytes.Buffer)
     _,err = pcmdata.ReadFrom(spout.AudioStream)
-    log.Printf("Poly Read  %d Bytes %s\n",pcmdata.Len())
+    //log.Printf("Poly Read  %d Bytes %s\n",pcmdata.Len())
 
 
     os.WriteFile("data.pcm", pcmdata.Bytes(), 0644)
@@ -167,19 +176,18 @@ func speak(text string) {
     cmd= exec.Command("aplay", "-D","sysdefault:CARD=PCH","-c","1","-f","S16_LE","-r","16000")
     cmd.Stdin = bytes.NewReader(pcmdata.Bytes())
     cmd.Run()
-
 }
 
 func speaker() {
   for {
     st := <- ch
-    log.Println("Speaker got text",st)
+    //log.Println("Speaker got text",st)
     if (st != "") {
       ch <- ""
       speak(st)
       time.Sleep(time.Duration(cfg.SpamInterval) * time.Second)
     }
-    log.Println("Speaker loop done",st)
+    //log.Println("Speaker loop done",st)
   }
 }
 
