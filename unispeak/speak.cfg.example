@@ -1,0 +1,7 @@
+SecretKey: "AWSSecretkey"
+AccessKey: "AWSAccessKey
+BotToken: "SlackBotTokenUNUSED"
+Token: "SlakTokenVerificationKey"
+Port: 8091
+AlsaDevice: sysdefault:CARD=PCH
+SpamInterval: 10

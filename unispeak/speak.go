@@ -46,7 +46,6 @@ type SpeakConfig struct {
    AccessKey string `yaml:"AccessKey"`
    BotToken string `yaml:"BotToken"`
    Token string `yaml:"Token"`
-   VerificationKey string `yaml:"VerificationKey"`
    Port int `yaml:"Port"`
    AlsaDevice string `yaml:"AlsaDevice"`
    SpamInterval int `yaml:"SpamInterval"`
