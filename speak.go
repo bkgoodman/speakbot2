@@ -15,6 +15,11 @@ echo 'U2FsdGVkX19Zh5RWjqNMl5n7AkOSCCSEbdqymT2IcP6+43QNTNP9cM94ltRX2wYuCvbGGRh7Wt
 
 
  aplay -D sysdefault:CARD=PCH -c 2 -f S16_LE  -r 22050  data.pcm
+
+Alsa device: sysdefault:CARD=PCH
+
+See devices w/ aplay -L
+
 */
 
 import (
@@ -22,6 +27,7 @@ import (
    "net/http"
    "bytes"
    "context"
+   "time"
    "os"
    "os/exec"
    //"encoding/json"
@@ -41,6 +47,8 @@ type SpeakConfig struct {
    BotToken string `yaml:"BotToken"`
    VerificationKey string `yaml:"VerificationKey"`
    Port int `yaml:"Port"`
+   AlsaDevice string `yaml:"AlsaDevice"`
+   SpamInterval int `yaml:"SpamInterval"`
 }
 
 func hello(w http.ResponseWriter, req *http.Request) {
@@ -58,6 +66,7 @@ func headers(w http.ResponseWriter, req *http.Request) {
 }
 
 var cfg SpeakConfig
+var ch = make(chan string,1)
 
 func slack(w http.ResponseWriter, req *http.Request) {
 
@@ -88,19 +97,26 @@ func slack(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		user_name := req.PostFormValue("user_name")
-		fmt.Fprintf(w,"user_name IS %s\n",user_name)
+		log.Printf("user_name IS %s\n",user_name)
 
 		user_id := req.PostFormValue("user_id")
-		fmt.Fprintf(w,"user_id IS %s\n",user_id)
+		log.Printf("user_id IS %s\n",user_id)
 
 		text := req.PostFormValue("text")
-		fmt.Fprintf(w,"test IS %s\n",text)
+		log.Printf("Text IS %s\n",text)
 
 		token := req.PostFormValue("token")
-		fmt.Fprintf(w,"TOKEN IS %s\n",token)
+		log.Printf("TOKEN IS %s\n",token)
 
 
-		fmt.Fprintf(os.Stderr,"FORM IS %v\n",req.Form)
+		log.Printf("FORM IS %v\n",req.Form)
+
+    select {
+      case ch <- text:
+        fmt.Fprintf(w,"%s Anouncing: %s",user_name,text)
+      default:
+        fmt.Fprintf(w,"Speakbot requires %d seconds between announcements. Please wait and retry",cfg.SpamInterval)
+    }
 
 	}
 }
@@ -146,12 +162,27 @@ func speak(text string) {
 
     os.WriteFile("data.pcm", pcmdata.Bytes(), 0644)
     spout.AudioStream.Close()
-    cmd:= exec.Command("aplay", "-D","sysdefault:CARD=PCH","-c","1","-f","S16_LE","-r","16000")
+    cmd:= exec.Command("aplay", "-D","sysdefault:CARD=PCH","prompt.wav")
+    cmd.Run()
+    cmd= exec.Command("aplay", "-D","sysdefault:CARD=PCH","-c","1","-f","S16_LE","-r","16000")
     cmd.Stdin = bytes.NewReader(pcmdata.Bytes())
     cmd.Run()
 
-
 }
+
+func speaker() {
+  for {
+    st := <- ch
+    log.Println("Speaker got text",st)
+    if (st != "") {
+      ch <- ""
+      speak(st)
+      time.Sleep(time.Duration(cfg.SpamInterval) * time.Second)
+    }
+    log.Println("Speaker loop done",st)
+  }
+}
+
 func main() {
 
     f, err := os.Open("speak.cfg")
@@ -166,6 +197,7 @@ func main() {
     http.HandleFunc("/slack", slack)
 
     log.Println("Listening Port",cfg.Port)
-    speak("This is a test of the emergency broadcasting system. In the event of an actual emergency, you should put your head between your legs and kiss your ass goodbye.")
+    speak("Speakbot active")
+    go speaker()
     http.ListenAndServe(fmt.Sprintf(":%d",cfg.Port), nil)
 }
