@@ -25,12 +25,13 @@ See devices w/ aplay -L
 import (
    "fmt"
    "net/http"
+   "net/url"
    "bytes"
    "context"
    "time"
    "os"
    "os/exec"
-   //"encoding/json"
+   "encoding/base64"
    "gopkg.in/yaml.v2"
 
   "log"
@@ -49,6 +50,7 @@ type SpeakConfig struct {
    Port int `yaml:"Port"`
    AlsaDevice string `yaml:"AlsaDevice"`
    SpamInterval int `yaml:"SpamInterval"`
+   BottomSpeaks []string `yaml:"BottomSpeaks"`
 }
 
 func hello(w http.ResponseWriter, req *http.Request) {
@@ -68,6 +70,34 @@ func headers(w http.ResponseWriter, req *http.Request) {
 var cfg SpeakConfig
 var ch = make(chan string,1)
 
+
+func bottom(w http.ResponseWriter, req *http.Request) {
+  log.Printf("Bottom Handler")
+   if (req.Method == "POST") {
+   		if err := req.ParseForm(); err != nil {
+			log.Printf( "ParseForm() err: %v", err)
+			return
+		}
+
+		text := req.PostFormValue("text")
+		audio := req.PostFormValue("audio")
+    log.Printf("Got text: %s\n",text)
+    ab, err := base64.URLEncoding.DecodeString(audio)
+    if (err != nil) {
+      log.Printf("Base64 decode error %s",err)
+    } else {
+      log.Printf("Got %d bytes PCM data",len(ab))
+      if (cfg.AlsaDevice != "") {
+        cmd:= exec.Command("aplay", "-D",cfg.AlsaDevice,"prompt.wav")
+        cmd.Run()
+        cmd= exec.Command("aplay", "-D",cfg.AlsaDevice,"-c","1","-f","S16_LE","-r","16000")
+        cmd.Stdin = bytes.NewReader(ab)
+        cmd.Run()
+      }
+    }
+    _ = audio
+  }
+}
 func slack(w http.ResponseWriter, req *http.Request) {
 
     for name, headers := range req.Header {
@@ -170,11 +200,22 @@ func speak(text string) {
 
     //os.WriteFile("data.pcm", pcmdata.Bytes(), 0644)
     spout.AudioStream.Close()
-    cmd:= exec.Command("aplay", "-D","sysdefault:CARD=PCH","prompt.wav")
-    cmd.Run()
-    cmd= exec.Command("aplay", "-D","sysdefault:CARD=PCH","-c","1","-f","S16_LE","-r","16000")
-    cmd.Stdin = bytes.NewReader(pcmdata.Bytes())
-    cmd.Run()
+
+    if (cfg.AlsaDevice != "") {
+      cmd:= exec.Command("aplay", "-D",cfg.AlsaDevice,"prompt.wav")
+      cmd.Run()
+      cmd= exec.Command("aplay", "-D",cfg.AlsaDevice,"-c","1","-f","S16_LE","-r","16000")
+      cmd.Stdin = bytes.NewReader(pcmdata.Bytes())
+      cmd.Run()
+    }
+
+    for _,bs := range cfg.BottomSpeaks {
+        log.Printf("Dispatch to bottom %s",bs)
+        response, err := http.PostForm(bs, url.Values{
+        "text": {text},
+        "audio": {base64.URLEncoding.EncodeToString(pcmdata.Bytes())}})
+        log.Printf("Response is %v+ %s\n",response,err)
+    }
 }
 
 func speaker() {
@@ -198,10 +239,12 @@ func main() {
     if (err != nil) {
       log.Fatal("Config Decode error: ",err)
     }
+    //log.Printf("Backends",cfg.BottomSpeaks)
     //awscfg, err := config.LoadDefaultConfig(context.TODO())
     http.HandleFunc("/hello", hello)
     http.HandleFunc("/headers", headers)
     http.HandleFunc("/slack", slack)
+    http.HandleFunc("/bottom", bottom)
 
     log.Println("Listening Port",cfg.Port)
     speak("Speakbot active")
