@@ -6,11 +6,37 @@ Writing packet: b'\x00\x00\x00\x00\x00\x01Z00\x02E$1BL000E0000AAU0040FFFF1AU0064
 Writing packet: b'\x00\x00\x00\x00\x00\x01Z00\x02E.TUA\x04'
 Writing packet: b'\x00\x00\x00\x00\x00\x01Z00\x02G1\x04'
 Writing packet: b'\x00\x00\x00\x00\x00\x01Z00\x02AA\x1b bTesting 1-2-3\x04'
+
+
+root@speakbot:/home/bkg# stty -a -F /dev/ttyUSB0
+speed 4800 baud; rows 0; columns 0; line = 0;
+intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^D; eol = <undef>; eol2 = <undef>; swtch = <undef>; start = ^Q; stop = ^S; susp = ^Z; rprnt = ^R; werase = ^W; lnext = ^V; discard = ^O;
+min = 0; time = 0;
+parenb -parodd -cmspar cs7 hupcl cstopb cread clocal -crtscts
+-ignbrk -brkint -ignpar -parmrk -inpck -istrip -inlcr -igncr -icrnl -ixon -ixoff -iuclc -ixany -imaxbel -iutf8
+-opost -olcuc -ocrnl -onlcr -onocr -onlret -ofill -ofdel nl0 cr0 tab0 bs0 vt0 ff0
+-isig -icanon -iexten -echo -echoe -echok -echonl -noflsh -xcase -tostop -echoprt -echoctl -echoke -flusho -extproc
+
+
+
+   self._conn = serial.Serial(port=self.device,
+                               baudrate=4800,
+                               parity=serial.PARITY_EVEN,
+                               stopbits=serial.STOPBITS_TWO,
+                               bytesize=serial.SEVENBITS,
+                               timeout=1,
+                               xonxoff=0,
+                               rtscts=0)
+
+
+4800 / 7 / 2 / Even
 */
 
 import (
   "log"
-  "encoding/hex"
+  //"encoding/hex"
+  "os"
+  "fmt"
 )
 
 const (
@@ -49,6 +75,10 @@ const (
   file_prot_unlocked = byte('U')
   file_prot_locked = byte('L')
 
+  run_seq_time = byte('T')
+  run_seq_order = byte('S')
+  run_seq_delete = byte('D')
+
 )
 
 type memCfg struct {
@@ -72,17 +102,26 @@ func ClearMemory() []byte {
   p := WriteSpecialFunction(func_clear_set_mem)
   return append(p,eot...)
 }
+
 func SetMemory(mem []memCfg) []byte {
   p := WriteSpecialFunction(func_clear_set_mem)
   for _,m := range mem {
-    log.Printf("%v",m)
+    b:= []byte{m.fileLabel,m.fileType,m.fileProt}
+    p =  append(p,b...)
+    x := fmt.Sprintf("%04X",m.size)
+    p =  append(p,[]byte(x)...)
+    x = fmt.Sprintf("%04X",m.q)
+    p =  append(p,[]byte(x)...)
   }
   return append(p,eot...)
 }
 
 func SetRunSequence() []byte {
   p:= WriteSpecialFunction(func_set_run_seq)
-  return p
+
+  b:= []byte{run_seq_time, file_prot_unlocked,'A'}
+  p =  append(p,b...)
+  return append(p,eot...)
 }
 
 func ClearText() []byte{
@@ -117,14 +156,43 @@ func WriteText(text string ) []byte{
 
 
 func header() []byte {
-  var h  = []byte {0x00, 0x00, 0x00, 0x00, 0x01, 'Z', 0x00, 0x02}
+  var h  = []byte {0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 'Z', byte('0'), byte('0'), 0x02}
   return h
 }
 
-func alphasign() {
+func alphasign(text string) {
 
-  var packet = ClearText()
-  log.Printf("ClearText:\n%s",hex.Dump(packet))
-  packet = WriteText("Test")
-  log.Printf("WriteText:\n%s",hex.Dump(packet))
+
+  //fd,err := os.Open("/dev/ttyUSB0")
+  fd, err := os.OpenFile("/dev/ttyUSB0", os.O_APPEND|os.O_WRONLY, 0644)
+  if (err != nil) { log.Fatal("Error opening port",err) }
+  var packet = ClearMemory()
+  //log.Printf("ClearMemory:\n%s",hex.Dump(packet))
+  fd.Write(packet)
+
+  mem := []memCfg{
+    {'1',file_type_string,file_prot_locked,0x000E,0x0000},
+    {'A',file_type_text,file_prot_unlocked,0x0040,0xFFFF},
+    {'1',file_type_text,file_prot_unlocked,0x0064,0xFEFE},
+    {'2',file_type_text,file_prot_unlocked,0x0064,0xFEFE},
+    {'3',file_type_text,file_prot_unlocked,0x0064,0xFEFE},
+    {'4',file_type_text,file_prot_unlocked,0x0064,0xFEFE},
+    {'5',file_type_text,file_prot_unlocked,0x0064,0xFEFE}}
+  packet = SetMemory(mem)
+  //log.Printf("SetMemory:\n%s",hex.Dump(packet))
+  fd.Write(packet)
+
+
+  packet = SetRunSequence()
+  //log.Printf("RunSequence:\n%s",hex.Dump(packet))
+  fd.Write(packet)
+
+  packet = ClearText()
+  //log.Printf("ClearText:\n%s",hex.Dump(packet))
+  fd.Write(packet)
+
+  packet = WriteText(text)
+  //log.Printf("WriteText:\n%s",hex.Dump(packet))
+  fd.Write(packet)
+  fd.Close()
 }

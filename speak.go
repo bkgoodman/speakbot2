@@ -233,6 +233,7 @@ func speaker() {
 
 func main() {
 
+    alphasign("AlphaSign Go Initialized")
     f, err := os.Open("speak.cfg")
     decoder := yaml.NewDecoder(f)
     err = decoder.Decode(&cfg)

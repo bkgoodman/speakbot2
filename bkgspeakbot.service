@@ -1,0 +1,11 @@
+[Unit]
+Description=Brad's New Speakbot
+After=network.target auditd.service
+
+[Service]
+Type=simple
+ExecStart=/home/bkg/speakbot
+WorkingDirectory=/home/bkg
+
+[Install]
+WantedBy=multi-user.target
