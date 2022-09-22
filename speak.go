@@ -25,6 +25,7 @@ See devices w/ aplay -L
 import (
    "fmt"
    "net/http"
+   "net/http/cgi"
    "net/url"
    "bytes"
    "context"
@@ -52,6 +53,7 @@ type SpeakConfig struct {
    SpamInterval int `yaml:"SpamInterval"`
    BottomSpeaks []string `yaml:"BottomSpeaks"`
    SignDevice string `yaml:"SignDevice"`
+   Mode string `yaml:"Mode"`
 }
 
 func hello(w http.ResponseWriter, req *http.Request) {
@@ -235,7 +237,9 @@ func speaker() {
   }
 }
 
+
 func main() {
+
 
     f, err := os.Open("speak.cfg")
     decoder := yaml.NewDecoder(f)
@@ -243,6 +247,22 @@ func main() {
     if (err != nil) {
       log.Fatal("Config Decode error: ",err)
     }
+
+    if (cfg.Mode == "CGI") {
+        err := cgi.Serve(http.HandlerFunc(slack))
+        if err != nil {
+          fmt.Printf("Status:%d %s\r\n", 500, "Cannot get request")
+          fmt.Printf("Content-Type: text/plain\r\n")
+          fmt.Printf("\r\n")
+          fmt.Printf("%s\r\n", "Cannot get request")
+            return
+        }
+
+        // Use req to handle request
+
+        return
+    }
+    
     //log.Printf("Backends",cfg.BottomSpeaks)
     //awscfg, err := config.LoadDefaultConfig(context.TODO())
     http.HandleFunc("/hello", hello)
