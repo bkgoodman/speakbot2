@@ -5,5 +5,5 @@ import (
 )
 
 func TestSpeak(t *testing.T) {
-	t.Log("test")
+  alphasign()
 }
