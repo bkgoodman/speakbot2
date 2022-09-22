@@ -5,3 +5,4 @@ Token: "SlakTokenVerificationKey"
 Port: 8091
 AlsaDevice: sysdefault:CARD=PCH
 SpamInterval: 10
+SignDevice: /dev/ttyUSB0

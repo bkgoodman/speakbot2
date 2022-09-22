@@ -36,6 +36,8 @@ import (
   "log"
   //"encoding/hex"
   "os"
+  "bytes"
+  "os/exec"
   "fmt"
 )
 
@@ -160,9 +162,24 @@ func header() []byte {
   return h
 }
 
-func alphasign(text string) {
+func alphasign_init(port string) {
+  args := []string{"4800", "cs7", "parenb", "raw", "-parodd", "-crtscts", "-echo", ("-F" + port)}
+  cmd := exec.Command("/bin/stty", args...)
+  var errout bytes.Buffer
+  cmd.Stderr = &errout
+  err := cmd.Run()
+  
+  if err != nil {
+    log.Fatal("Error alphasign init Error: ", errout.String())
+    return
+  } 
+  cmd = exec.Command("/bin/echo", args...)
+  err = cmd.Run()
+}
 
+func alphasign(text string,port string) {
 
+  alphasign_init(port)
   //fd,err := os.Open("/dev/ttyUSB0")
   fd, err := os.OpenFile("/dev/ttyUSB0", os.O_APPEND|os.O_WRONLY, 0644)
   if (err != nil) { log.Fatal("Error opening port",err) }
@@ -195,4 +212,5 @@ func alphasign(text string) {
   //log.Printf("WriteText:\n%s",hex.Dump(packet))
   fd.Write(packet)
   fd.Close()
+  
 }

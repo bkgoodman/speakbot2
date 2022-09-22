@@ -51,6 +51,7 @@ type SpeakConfig struct {
    AlsaDevice string `yaml:"AlsaDevice"`
    SpamInterval int `yaml:"SpamInterval"`
    BottomSpeaks []string `yaml:"BottomSpeaks"`
+   SignDevice string `yaml:"SignDevice"`
 }
 
 func hello(w http.ResponseWriter, req *http.Request) {
@@ -209,6 +210,9 @@ func speak(text string) {
       cmd.Run()
     }
 
+    if (cfg.SignDevice != "") {
+      alphasign(text,cfg.SignDevice)
+    }
     for _,bs := range cfg.BottomSpeaks {
         log.Printf("Dispatch to bottom %s",bs)
         response, err := http.PostForm(bs, url.Values{
@@ -233,7 +237,6 @@ func speaker() {
 
 func main() {
 
-    alphasign("AlphaSign Go Initialized")
     f, err := os.Open("speak.cfg")
     decoder := yaml.NewDecoder(f)
     err = decoder.Decode(&cfg)
