@@ -85,6 +85,9 @@ func bottom(w http.ResponseWriter, req *http.Request) {
 		text := req.PostFormValue("text")
 		audio := req.PostFormValue("audio")
     log.Printf("Got text: %s\n",text)
+    if (cfg.SignDevice != "") {
+      alphasign(text,cfg.SignDevice)
+    }
     ab, err := base64.URLEncoding.DecodeString(audio)
     if (err != nil) {
       log.Printf("Base64 decode error %s",err)
@@ -151,11 +154,16 @@ func slack(w http.ResponseWriter, req *http.Request) {
 		//log.Printf("FORM IS %v\n",req.Form)
     log.Printf("%s:%s: %s",user_id,user_name,text)
 
-    select {
-      case ch <- text:
-        fmt.Fprintf(w,"%s Anouncing: %s",user_name,text)
-      default:
-        fmt.Fprintf(w,"Speakbot requires %d seconds between announcements. Please wait and retry",cfg.SpamInterval)
+      fmt.Fprintf(w,"CGI %s Anouncing: %s",user_name,text)
+      if (cfg.Mode == "CGI") {
+      speak(text)
+    } else {
+      select {
+        case ch <- text:
+          fmt.Fprintf(w,"%s Anouncing: %s",user_name,text)
+        default:
+          fmt.Fprintf(w,"Speakbot requires %d seconds between announcements. Please wait and retry",cfg.SpamInterval)
+      }
     }
 
 	}
@@ -163,6 +171,7 @@ func slack(w http.ResponseWriter, req *http.Request) {
 
 func speak(text string) {
 
+     fmt.Fprintf(os.Stderr,"Speacking\n")
     awscfg, err := config.LoadDefaultConfig(context.TODO(),
       // Hard coded credentials.
       config.WithRegion("us-east-1"),
@@ -173,6 +182,7 @@ func speak(text string) {
         },
 		}))
     if err != nil {
+      fmt.Fprintf(os.Stderr,"AWS Polly Load error: %s\n",err)
       log.Fatal(err)
     }
     p := polly.NewFromConfig(awscfg)
@@ -194,7 +204,7 @@ func speak(text string) {
     //log.Printf(t)
     spout, errout := p.SynthesizeSpeech(context.TODO(),ssin)
     if (errout != nil) {
-      log.Printf("Poly Speak err %s\n",errout)
+      fmt.Fprintf(os.Stderr,"AWS Polly error: %s\n",errout)
     }
     pcmdata := new(bytes.Buffer)
     _,err = pcmdata.ReadFrom(spout.AudioStream)
@@ -216,17 +226,18 @@ func speak(text string) {
       alphasign(text,cfg.SignDevice)
     }
     for _,bs := range cfg.BottomSpeaks {
-        log.Printf("Dispatch to bottom %s",bs)
+        fmt.Fprintf(os.Stderr, "Dispatch to Bottom: \"%s\"\n",bs)
         response, err := http.PostForm(bs, url.Values{
         "text": {text},
         "audio": {base64.URLEncoding.EncodeToString(pcmdata.Bytes())}})
-        log.Printf("Response is %v+ %s\n",response,err)
+        fmt.Fprintf(os.Stderr, "Response is %v %s\n",response,err)
     }
 }
 
 func speaker() {
   for {
     st := <- ch
+    fmt.Fprintf(os.Stderr,"Got from Speaker: %s\n",st)
     //log.Println("Speaker got text",st)
     if (st != "") {
       ch <- ""
@@ -248,6 +259,7 @@ func main() {
       log.Fatal("Config Decode error: ",err)
     }
 
+    fmt.Fprintf(os.Stderr,"Speak log is %v\n",cfg)
     if (cfg.Mode == "CGI") {
         err := cgi.Serve(http.HandlerFunc(slack))
         if err != nil {
