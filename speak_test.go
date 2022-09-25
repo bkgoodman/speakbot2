@@ -5,5 +5,4 @@ import (
 )
 
 func TestSpeak(t *testing.T) {
-  alphasign()
 }

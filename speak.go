@@ -28,6 +28,7 @@ import (
    "net/http/cgi"
    "net/url"
    "bytes"
+    "sync"
    "context"
    "time"
    "os"
@@ -53,6 +54,7 @@ type SpeakConfig struct {
    SpamInterval int `yaml:"SpamInterval"`
    BottomSpeaks []string `yaml:"BottomSpeaks"`
    SignDevice string `yaml:"SignDevice"`
+   NotifyChannel string `yaml:"NotifyChannel"`
    Mode string `yaml:"Mode"`
 }
 
@@ -72,6 +74,7 @@ func headers(w http.ResponseWriter, req *http.Request) {
 
 var cfg SpeakConfig
 var ch = make(chan string,1)
+var wg sync.WaitGroup
 
 
 func bottom(w http.ResponseWriter, req *http.Request) {
@@ -154,9 +157,11 @@ func slack(w http.ResponseWriter, req *http.Request) {
 		//log.Printf("FORM IS %v\n",req.Form)
     log.Printf("%s:%s: %s",user_id,user_name,text)
 
-      fmt.Fprintf(w,"CGI %s Anouncing: %s",user_name,text)
+    fmt.Fprintf(w,"CGI %s Anouncing: %s",user_name,text)
       if (cfg.Mode == "CGI") {
-      speak(text)
+      fmt.Fprintf(w,"%s Anouncing: %s",user_name,text)
+      wg.Add(1)
+      go speak(text)
     } else {
       select {
         case ch <- text:
@@ -169,7 +174,9 @@ func slack(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// Add the waitgroup before calling!
 func speak(text string) {
+    defer wg.Done()
 
      fmt.Fprintf(os.Stderr,"Speacking\n")
     awscfg, err := config.LoadDefaultConfig(context.TODO(),
@@ -241,6 +248,7 @@ func speaker() {
     //log.Println("Speaker got text",st)
     if (st != "") {
       ch <- ""
+      wg.Add(1)
       speak(st)
       time.Sleep(time.Duration(cfg.SpamInterval) * time.Second)
     }

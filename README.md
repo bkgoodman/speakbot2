@@ -43,4 +43,6 @@ BotToken isn't used right now - but was intented to hold Slack "bot" credentials
 
 Create your bot in app, and configure as a "Slash Command". Just give it the URL where Slack can reach a running Speechbot
 
+`NotifyChannel` is the chanel identifier if you want speak commands logged to a Slack channel
+
 

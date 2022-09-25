@@ -20,4 +20,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.13.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.16.18 // indirect
 	github.com/aws/smithy-go v1.13.3 // indirect
+	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/slack-go/slack v0.11.3 // indirect
 )
