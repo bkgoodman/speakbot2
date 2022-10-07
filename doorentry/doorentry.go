@@ -41,13 +41,18 @@ func main() {
   db, err := sql.Open("sqlite", cfg.DBFile)
   if (err != nil) { log.Fatal("Cannot open DB File",cfg.DBFile,err) }
   defer func() { db.Close() }()
-  stmt, err := db.Prepare("SELECT member FROM members WHERE id = ?")
+  stmt, err := db.Prepare("SELECT member, firstname, lastname, nickname FROM members WHERE id = ?")
   if (err != nil) { log.Fatal("Prepare failed ",err) }
-  var name string
-  err = stmt.QueryRow(memberId).Scan(&name)
+  var name,member,first,last,nick string
+  err = stmt.QueryRow(memberId).Scan(&member,&first, &last, &nick)
   if (err != nil) { log.Fatal("No member found ",name,err) }
+  if (nick =="") {
+    name = first+" "+last
+  } else {
+    name = nick+" "+last
+  }
   fmt.Println(name)
-  filename := cfg.AudioDir+"/"+name+".pcm"
+  filename := cfg.AudioDir+"/"+member+".pcm"
   if _, err := os.Stat(filename); errors.Is(err, os.ErrNotExist) {
     log.Fatal("Path does not exist for member"); return
   }
