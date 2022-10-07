@@ -7,6 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.17.6
 	github.com/aws/aws-sdk-go-v2/credentials v1.12.19
 	github.com/aws/aws-sdk-go-v2/service/polly v1.17.8
+	github.com/slack-go/slack v0.11.3
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -21,5 +22,4 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.16.18 // indirect
 	github.com/aws/smithy-go v1.13.3 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
-	github.com/slack-go/slack v0.11.3 // indirect
 )

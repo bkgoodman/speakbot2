@@ -1,9 +1,9 @@
 .PHONY: all
-all: speakbot speakbotrpi
+all: speakbot speakbotrpi 
 
 speakbot: speak.go
 	go build -o speakbot
-
+	
 speakbotrpi: speak.go
 	GOARCH=arm go build -o speakbotrpi
 

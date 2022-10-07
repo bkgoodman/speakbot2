@@ -28,13 +28,13 @@ import (
    "net/http/cgi"
    "net/url"
    "bytes"
-    "sync"
    "context"
    "time"
    "os"
    "os/exec"
    "encoding/base64"
    "gopkg.in/yaml.v2"
+   //"syscall"
 
   "log"
   "github.com/aws/aws-sdk-go-v2/aws"
@@ -74,28 +74,32 @@ func headers(w http.ResponseWriter, req *http.Request) {
 
 var cfg SpeakConfig
 var ch = make(chan string,1)
-var wg sync.WaitGroup
+var persistText string = ""
 
 
 func bottom(w http.ResponseWriter, req *http.Request) {
-  log.Printf("Bottom Handler")
    if (req.Method == "POST") {
    		if err := req.ParseForm(); err != nil {
-			log.Printf( "ParseForm() err: %v", err)
+			fmt.Fprintf(os.Stderr, "ParseForm() err: %v", err)
 			return
 		}
 
 		text := req.PostFormValue("text")
+		quickText := req.PostFormValue("quickText")
 		audio := req.PostFormValue("audio")
-    log.Printf("Got text: %s\n",text)
-    if (cfg.SignDevice != "") {
+    //log.Printf("Got text: %s\n",text)
+    if ((cfg.SignDevice != "") && (quickText != "")) {
+      alphasign(quickText,cfg.SignDevice)
+    }
+    if (cfg.SignDevice != "" && quickText == "" && text != "") {
+      persistText = text
       alphasign(text,cfg.SignDevice)
     }
     ab, err := base64.URLEncoding.DecodeString(audio)
     if (err != nil) {
-      log.Printf("Base64 decode error %s",err)
+      //log.Printf("Base64 decode error %s",err)
     } else {
-      log.Printf("Got %d bytes PCM data",len(ab))
+      //log.Printf("Got %d bytes PCM data",len(ab))
       if (cfg.AlsaDevice != "") {
         cmd:= exec.Command("aplay", "-D",cfg.AlsaDevice,"prompt.wav")
         cmd.Run()
@@ -104,9 +108,14 @@ func bottom(w http.ResponseWriter, req *http.Request) {
         cmd.Run()
       }
     }
+    if (cfg.SignDevice != "" && quickText != "") {
+      time.Sleep(10*time.Second)
+      alphasign(persistText,cfg.SignDevice)
+    }
     _ = audio
   }
 }
+var textout string
 func slack(w http.ResponseWriter, req *http.Request) {
 
     for name, headers := range req.Header {
@@ -132,15 +141,15 @@ func slack(w http.ResponseWriter, req *http.Request) {
 
    if (req.Method == "POST") {
    		if err := req.ParseForm(); err != nil {
-			log.Printf( "ParseForm() err: %v", err)
+			//log.Printf( "ParseForm() err: %v", err)
 			return
 		}
 
 		token := req.PostFormValue("token")
 		//log.Printf("TOKEN IS %s\n",token)
 		if (token != cfg.Token) {
-			log.Printf("Invalid token \"%s\"",token)
-      fmt.Fprintf(w,"Invalid Token")
+			fmt.Fprintf(os.Stderr,"Invalid token \"%s\"",token)
+      fmt.Fprintf(os.Stderr,"Invalid Token")
       return
     }
 		user_name := req.PostFormValue("user_name")
@@ -157,11 +166,24 @@ func slack(w http.ResponseWriter, req *http.Request) {
 		//log.Printf("FORM IS %v\n",req.Form)
     log.Printf("%s:%s: %s",user_id,user_name,text)
 
-    fmt.Fprintf(w,"CGI %s Anouncing: %s",user_name,text)
-      if (cfg.Mode == "CGI") {
-      fmt.Fprintf(w,"%s Anouncing: %s",user_name,text)
-      wg.Add(1)
-      go speak(text)
+    if (cfg.NotifyChannel != "") {
+      post_slack(user_name,text)
+    }
+
+
+    if (cfg.Mode == "CGI") {
+      /*
+      id, _, _ := syscall.Syscall(syscall.SYS_FORK, 0, 0, 0)
+      if (id != 0) {
+        fmt.Fprintf(w,"%s Anouncing: %s",user_name,text)
+        fmt.Fprintf(os.Stderr,"Child exit\n")
+        return
+      }
+      */
+      fmt.Fprintf(os.Stderr,"Dispacthed speak\n")
+      //speak(text) DONT SPEAK HERE! Will make CGI timeout. Thus function (HttpHandler) must exit first!
+      textout = text
+      fmt.Fprintf(os.Stderr,"Speak Done speak\n")
     } else {
       select {
         case ch <- text:
@@ -176,9 +198,8 @@ func slack(w http.ResponseWriter, req *http.Request) {
 
 // Add the waitgroup before calling!
 func speak(text string) {
-    defer wg.Done()
 
-     fmt.Fprintf(os.Stderr,"Speacking\n")
+    fmt.Fprintf(os.Stderr,"Speaking\n")
     awscfg, err := config.LoadDefaultConfig(context.TODO(),
       // Hard coded credentials.
       config.WithRegion("us-east-1"),
@@ -192,14 +213,17 @@ func speak(text string) {
       fmt.Fprintf(os.Stderr,"AWS Polly Load error: %s\n",err)
       log.Fatal(err)
     }
+    fmt.Fprintf(os.Stderr,"Poly1\n")
     p := polly.NewFromConfig(awscfg)
 
+    fmt.Fprintf(os.Stderr,"Poly2\n")
     //log.Printf("CONFIG is %v+\n",cfg)
     input := &polly.DescribeVoicesInput{LanguageCode: "en-US"}
     _, err = p.DescribeVoices(context.TODO(),input)
     //log.Printf("Poly is %T %v+\n",p,p)
     //log.Printf("DescribeVoices %v is %T %v+\n",err,resp,resp)
 
+    fmt.Fprintf(os.Stderr,"Poly3\n")
     t := fmt.Sprintf("<speak><amazon:domain name=\"news\"><prosody volume=\"x-loud\" rate=\"slow\">%s</prosody></amazon:domain></speak>",text)
     ssin := &polly.SynthesizeSpeechInput{
       OutputFormat: pollytype.OutputFormatPcm,
@@ -209,6 +233,7 @@ func speak(text string) {
       Engine: pollytype.EngineNeural,
       Text: &t}
     //log.Printf(t)
+    fmt.Fprintf(os.Stderr,"Synthesizing\n")
     spout, errout := p.SynthesizeSpeech(context.TODO(),ssin)
     if (errout != nil) {
       fmt.Fprintf(os.Stderr,"AWS Polly error: %s\n",errout)
@@ -221,6 +246,7 @@ func speak(text string) {
     //os.WriteFile("data.pcm", pcmdata.Bytes(), 0644)
     spout.AudioStream.Close()
 
+    fmt.Fprintf(os.Stderr,"Aplaying\n")
     if (cfg.AlsaDevice != "") {
       cmd:= exec.Command("aplay", "-D",cfg.AlsaDevice,"prompt.wav")
       cmd.Run()
@@ -229,16 +255,21 @@ func speak(text string) {
       cmd.Run()
     }
 
+    fmt.Fprintf(os.Stderr,"Alphasigning\n")
     if (cfg.SignDevice != "") {
       alphasign(text,cfg.SignDevice)
     }
+    fmt.Fprintf(os.Stderr,"Bottomspeaking\n")
     for _,bs := range cfg.BottomSpeaks {
         fmt.Fprintf(os.Stderr, "Dispatch to Bottom: \"%s\"\n",bs)
         response, err := http.PostForm(bs, url.Values{
         "text": {text},
         "audio": {base64.URLEncoding.EncodeToString(pcmdata.Bytes())}})
-        fmt.Fprintf(os.Stderr, "Response is %v %s\n",response,err)
+        if (err != nil) {
+          fmt.Fprintf(os.Stderr, "Bottom response is %v %s\n",response,err)
+        }
     }
+     fmt.Fprintf(os.Stderr,"Speak is done\n")
 }
 
 func speaker() {
@@ -248,7 +279,6 @@ func speaker() {
     //log.Println("Speaker got text",st)
     if (st != "") {
       ch <- ""
-      wg.Add(1)
       speak(st)
       time.Sleep(time.Duration(cfg.SpamInterval) * time.Second)
     }
@@ -269,7 +299,20 @@ func main() {
 
     fmt.Fprintf(os.Stderr,"Speak log is %v\n",cfg)
     if (cfg.Mode == "CGI") {
-        err := cgi.Serve(http.HandlerFunc(slack))
+      fmt.Fprintf(os.Stderr,"CGI Serving\n")
+      err := cgi.Serve(http.HandlerFunc(slack))
+      fmt.Fprintf(os.Stderr,"CGI Served\n")
+      // NOW we can call "speak"!?
+      //os.Stdout.Close()
+      //os.Stdin.Close()
+      /*
+      id, _, _ := syscall.Syscall(syscall.SYS_FORK, 0, 0, 0)
+      if (id == 0) {
+        fmt.Fprintf(os.Stderr,"Speak from Fork\n")
+        speak(textout)
+        fmt.Fprintf(os.Stderr,"Forked speak done\n")
+      }
+      */
         if err != nil {
           fmt.Printf("Status:%d %s\r\n", 500, "Cannot get request")
           fmt.Printf("Content-Type: text/plain\r\n")
@@ -277,10 +320,11 @@ func main() {
           fmt.Printf("%s\r\n", "Cannot get request")
             return
         }
+        speak(textout)
 
         // Use req to handle request
-
-        return
+      fmt.Fprintf(os.Stderr,"CGI Wait done\n")
+      return
     }
     
     //log.Printf("Backends",cfg.BottomSpeaks)

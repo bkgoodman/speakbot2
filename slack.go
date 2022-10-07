@@ -17,11 +17,13 @@ func post_slack(user string, text string) {
     }
 
     api := slk.New(cfg.BotToken)
-   	c, rw, _, err := api.JoinConversation(cfg.NotifyChannel)
-	if err != nil {
-		fmt.Printf("Join Error %s %s\n", rw,err)
-		return
-	}
-  fmt.Printf("Got channel %v\n",c)
-  _, _, err = api.PostMessage(cfg.NotifyChannel,slk.MsgOptionText("This is a test",false))
+   	_, _, _, err = api.JoinConversation(cfg.NotifyChannel)
+  if (err != nil) {
+    fmt.Fprintf(os.Stderr,"Slack Join Channel error %s\n",err)
+  }
+  //fmt.Printf("Got channel %v\n",c)
+  _, _, err = api.PostMessage(cfg.NotifyChannel,slk.MsgOptionText(fmt.Sprintf("%s posted \"%s\"",user,text),false))
+  if (err != nil) {
+    fmt.Fprintf(os.Stderr,"Slack post message error %s\n",err)
+  }
 }

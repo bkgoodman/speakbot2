@@ -1,0 +1,4 @@
+DBFile: /var/www/authbackend-ng-staging/makeit.db
+AudioDir:  /var/www/memberAudio
+BottomSpeaks:
+  - http://speakbot:8090/bottom
