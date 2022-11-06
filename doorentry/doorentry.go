@@ -10,7 +10,6 @@ import (
   "os"
   "flag"
   "strconv"
-  "errors"
    "gopkg.in/yaml.v2"
   _ "modernc.org/sqlite"
 )
@@ -52,18 +51,27 @@ func main() {
     name = nick+" "+last
   }
   fmt.Println(name)
-  filename := cfg.AudioDir+"/"+member+".pcm"
-  if _, err := os.Stat(filename); errors.Is(err, os.ErrNotExist) {
-    log.Fatal("Path does not exist for member"); return
-  }
-  pcmdata, err := os.ReadFile(filename)
-  if (err != nil) { log.Fatal("Error reading member PCM data ",name,err) }
 
+  pcmstr := ""
+
+  filename := cfg.AudioDir+"/"+member+".pcm"
+  _, err = os.Stat(filename)
+  if (err  != nil) {
+      log.Println("Member audio file non existant ",name,err) 
+  } else 
+  {
+    pcmdata, err := os.ReadFile(filename)
+    if (err != nil) { 
+      log.Println("Error reading member PCM data ",name,err) 
+    } else {
+      pcmstr = base64.URLEncoding.EncodeToString(pcmdata)
+    }
+  }
   for _,bs := range cfg.BottomSpeaks {
         fmt.Fprintf(os.Stderr, "Dispatch to Bottom: \"%s\"\n",bs)
         response, err := http.PostForm(bs, url.Values{
         "quickText": { "Welcome "+name},
-        "audio": {base64.URLEncoding.EncodeToString(pcmdata)}})
+        "audio": { pcmstr }})
         if (err != nil) {
           fmt.Fprintf(os.Stderr, "Bottom response from %s is %v %s\n",bs,response,err)
         }

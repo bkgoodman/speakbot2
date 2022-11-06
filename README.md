@@ -3,7 +3,7 @@
 ## Modes
 Speakbot runs in two different *modes*
 
-- `CGI` App is called via a web server as a CGI when a request comes in.
+- `CGI` App is called via a web server as a CGI when a request comes in. (*DEPRICATED*? Threading issues???)
 - `Daemon` run the app and it will start it's own daemon, awaiting requests on the speified `Port`
 
 CGI mode does NOT WORK properly and will probably never. This is because the upstream CGI provider (Apache) waits for the process to _terminate_ before closing the connection. This inherently means the entire process here has to have been completed. Slack on the other hand wants a response within 3 seconds, and if it doesn't get one returns a timeout. Thus, this needs to run as a standalone daemon which can respond to the incomming Slack request, _close_ the connection, then continue to handle the speech in another thread/goroutine. (I tried forks and subprocesses, this inherently couldn't fix this problem, or created others)

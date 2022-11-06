@@ -12,7 +12,13 @@ speakbotrpi: speak.go
 clean:
 	rm -rf speakbot speakbotrpi *~
 
-.PHONY: install
-install: speakbotrpi
+.PHONY: updatelocal
+updatelocal: speakbot
+	systemctl stop bkgspeakbot.service
+	cp speakbot /root/speakbot_live/speakbot
+	systemctl start bkgspeakbot.service
+
+.PHONY: remoteinstall
+remoteinstall: speakbotrpi
 	scp speakbotrpi bkg@speakbot:speakbot
 	scp speakbotrpi bkg@garagebot:speakbot
