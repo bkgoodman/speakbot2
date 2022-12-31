@@ -185,10 +185,6 @@ func slack(w http.ResponseWriter, req *http.Request) {
 		//log.Printf("FORM IS %v\n",req.Form)
     log.Printf("%s:%s: %s",user_id,user_name,text)
 
-    if (cfg.NotifyChannel != "") {
-      post_slack(user_name,text)
-    }
-
 
     if (cfg.Mode == "CGI") {
       // CGI is Depricated due to threading issues??
@@ -207,6 +203,10 @@ func slack(w http.ResponseWriter, req *http.Request) {
     } else if  ((command ==  "/speakhelp") || (command == "/helpspeak")) {
           fmt.Fprintf(w,"%s",cfg.SpeakHelp)
     } else {
+      if (cfg.NotifyChannel != "") {
+        post_slack(user_name,text)
+      }
+
       if (command[0] == '/') { command = command[1:]}
       speakreq := SpeakRequest{text,command}
       select {
@@ -288,9 +288,19 @@ func speak(text string,slashcmd string) {
         fmt.Fprintf(os.Stderr, "Match attempt: \"%s\"\n",bs)
         if (slices.Contains(bs.Commands,slashcmd)) {
           fmt.Fprintf(os.Stderr, "Dispatch to Bottom: \"%s\"\n",bs)
+          v := url.Values{
+            "audio": {base64.URLEncoding.EncodeToString(pcmdata.Bytes())}}
+          if ((slashcmd == "flash") || (slashcmd == "/flash")) {
+            v.Add("quickText",text)
+          } else {
+            v.Add("text",text)
+          }
+          response, err := http.PostForm(bs.URL, v)
+          /*
           response, err := http.PostForm(bs.URL, url.Values{
           "text": {text},
           "audio": {base64.URLEncoding.EncodeToString(pcmdata.Bytes())}})
+          */
           if (err != nil) {
             fmt.Fprintf(os.Stderr, "Bottom response is %v %s\n",response,err)
           }
