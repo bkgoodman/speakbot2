@@ -26,6 +26,8 @@ var cfg DoorConfig
 
 func main() {
   configFile := flag.String("config","doorentry.cfg","Path to config file")
+  quiet := flag.Bool("quiet",false,"Be Quiet")
+  silent := flag.Bool("silent",false,"Be Silent")
   flag.Parse()
 
   f, err := os.Open(*configFile)
@@ -67,10 +69,19 @@ func main() {
       pcmstr = base64.URLEncoding.EncodeToString(pcmdata)
     }
   }
+
+  silentStr  := "False"
+  quietStr  := "False"
+
+  if *silent { silentStr = "True" }
+  if *quiet { quietStr = "True" } 
+
   for _,bs := range cfg.BottomSpeaks {
         fmt.Fprintf(os.Stderr, "Dispatch to Bottom: \"%s\"\n",bs)
         response, err := http.PostForm(bs, url.Values{
         "quickText": { "Welcome "+name},
+        "quiet": { quietStr },
+        "silent": { silentStr },
         "audio": { pcmstr }})
         if (err != nil) {
           fmt.Fprintf(os.Stderr, "Bottom response from %s is %v %s\n",bs,response,err)

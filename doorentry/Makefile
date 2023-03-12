@@ -7,3 +7,9 @@ run: doorentry
 
 doorentry: doorentry.go
 	go build -o doorentry
+
+.PHONY: remoteinstall
+remoteinstall: doorentry
+
+	scp doorentry bkg@auth:doorentry
+	ssh bkg@auth sudo /usr/bin/cp /home/bkg/doorentry /var/www/authbackend/doorentry

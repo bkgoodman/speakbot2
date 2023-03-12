@@ -49,6 +49,8 @@ import (
 type SpeakRequest struct {
   Text string 
   SlashCommand string
+  Silent bool
+  Quiet bool
 }
 
 type BottomSpeak struct {
@@ -87,8 +89,10 @@ func headers(w http.ResponseWriter, req *http.Request) {
 
 var cfg SpeakConfig
 var ch = make(chan SpeakRequest,1)
+var clearDisp= time.NewTimer(7200 * time.Second)
 var persistText string = ""
 
+var silenceUntil time.Time = time.Now()
 
 func bottom(w http.ResponseWriter, req *http.Request) {
    if (req.Method == "POST") {
@@ -100,6 +104,8 @@ func bottom(w http.ResponseWriter, req *http.Request) {
 		text := req.PostFormValue("text")
 		quickText := req.PostFormValue("quickText")
 		audio := req.PostFormValue("audio")
+		quiet := req.PostFormValue("quiet")
+		silent := req.PostFormValue("silent")
     //log.Printf("Got text: %s\n",text)
     if ((cfg.SignDevice != "") && (quickText != "")) {
       alphasign(quickText,cfg.SignDevice)
@@ -115,10 +121,12 @@ func bottom(w http.ResponseWriter, req *http.Request) {
         //log.Printf("Base64 decode error %s",err)
       } else {
         //log.Printf("Got %d bytes PCM data",len(ab))
-        if (cfg.AlsaDevice != "") {
+        if ((cfg.AlsaDevice != "") && (quiet==""))  {
           cmd:= exec.Command("aplay", "-D",cfg.AlsaDevice,"prompt.wav")
           cmd.Run()
-          cmd= exec.Command("aplay", "-D",cfg.AlsaDevice,"-c","1","-f","S16_LE","-r","16000")
+        }
+        if ((cfg.AlsaDevice != "") && (silent=="") && (quiet==""))  {
+          cmd:= exec.Command("aplay", "-D",cfg.AlsaDevice,"-c","1","-f","S16_LE","-r","16000")
           cmd.Stdin = bytes.NewReader(ab)
           cmd.Run()
         }
@@ -183,7 +191,7 @@ func slack(w http.ResponseWriter, req *http.Request) {
 
 
 		//log.Printf("FORM IS %v\n",req.Form)
-    log.Printf("%s:%s: %s",user_id,user_name,text)
+    fmt.Printf("REQUEST: %s:%s:%s: %s",user_id,user_name,command,text)
 
 
     if (cfg.Mode == "CGI") {
@@ -206,14 +214,37 @@ func slack(w http.ResponseWriter, req *http.Request) {
       if (cfg.NotifyChannel != "") {
         post_slack(user_name,text)
       }
+      var silence bool
+      var quiet = false
+      if (silenceUntil.After(time.Now())) {
+        silence = true
+        fmt.Fprintf(w,"Displaying quiet: Since mode in affect for another %s\n",-time.Since(silenceUntil))
+      } else {
+        silence = false
+      }
 
       if (command[0] == '/') { command = command[1:]}
-      speakreq := SpeakRequest{text,command}
-      select {
-        case ch <- speakreq:
-          fmt.Fprintf(w,"%s Anouncing: %s",user_name,text)
-        default:
-          fmt.Fprintf(w,"Speakbot requires %d seconds between announcements. Please wait and retry",cfg.SpamInterval)
+      if (command == "silent") {
+        silence = true
+        quiet = false
+        fmt.Fprintf(w,"Being silent (no alert tone)\n")
+      }
+      if (command == "quiet") {
+        silence = false
+        quiet = true
+        fmt.Fprintf(w,"Being quiet\n")
+      }
+      if (command == "silence") {
+            silenceUntil = time.Now().Add(time.Hour *2)
+            fmt.Fprintf(w,"Silencing for 2 hours")
+      } else {
+        speakreq := SpeakRequest{text,command,quiet,silence}
+        select {
+          case ch <- speakreq:
+            fmt.Fprintf(w,"%s Anouncing: %s",user_name,text)
+          default:
+            fmt.Fprintf(w,"Speakbot requires %d seconds between announcements. Please wait and retry",cfg.SpamInterval)
+        }
       }
     }
 
@@ -221,7 +252,7 @@ func slack(w http.ResponseWriter, req *http.Request) {
 }
 
 // Add the waitgroup before calling!
-func speak(text string,slashcmd string) {
+func speak(text string,slashcmd string, quiet bool, silent bool) {
 
     fmt.Fprintf(os.Stderr,"Speaking\n")
     awscfg, err := config.LoadDefaultConfig(context.TODO(),
@@ -272,11 +303,16 @@ func speak(text string,slashcmd string) {
 
     fmt.Fprintf(os.Stderr,"Aplaying\n")
     if (cfg.AlsaDevice != "") {
-      cmd:= exec.Command("aplay", "-D",cfg.AlsaDevice,"prompt.wav")
-      cmd.Run()
-      cmd= exec.Command("aplay", "-D",cfg.AlsaDevice,"-c","1","-f","S16_LE","-r","16000")
-      cmd.Stdin = bytes.NewReader(pcmdata.Bytes())
-      cmd.Run()
+      if (!silent) {
+        cmd:= exec.Command("aplay", "-D",cfg.AlsaDevice,"prompt.wav")
+        cmd.Run()
+      }
+
+      if ((!silent) && (!quiet))  {
+        cmd := exec.Command("aplay", "-D",cfg.AlsaDevice,"-c","1","-f","S16_LE","-r","16000")
+        cmd.Stdin = bytes.NewReader(pcmdata.Bytes())
+        cmd.Run()
+      }
     }
 
     fmt.Fprintf(os.Stderr,"Alphasigning\n")
@@ -295,6 +331,12 @@ func speak(text string,slashcmd string) {
           } else {
             v.Add("text",text)
           }
+          if ((silent) || (silenceUntil.After(time.Now()))) {
+            v.Add("silent","true")
+          }
+          if (quiet) {
+            v.Add("quiet","true")
+          }
           response, err := http.PostForm(bs.URL, v)
           /*
           response, err := http.PostForm(bs.URL, url.Values{
@@ -307,6 +349,9 @@ func speak(text string,slashcmd string) {
         }
     }
      fmt.Fprintf(os.Stderr,"Speak is done\n")
+
+    clearDisp.Reset(7200 * time.Second)
+
 }
 
 func speaker() {
@@ -315,8 +360,8 @@ func speaker() {
     fmt.Fprintf(os.Stderr,"Got from Speaker: %s\n",speachreq.Text)
     //log.Println("Speaker got text",st)
     if (speachreq.Text != "") {
-      ch <- SpeakRequest{"",""}
-      speak(speachreq.Text,speachreq.SlashCommand)
+      ch <- SpeakRequest{"","",speachreq.Quiet,speachreq.Silent}
+      speak(speachreq.Text,speachreq.SlashCommand,speachreq.Quiet,speachreq.Silent)
       time.Sleep(time.Duration(cfg.SpamInterval) * time.Second)
     }
     //log.Println("Speaker loop done",st)
@@ -327,6 +372,12 @@ func speaker() {
 func main() {
 
 
+    go func() {
+      for {
+        <-clearDisp.C
+        speak("Welcome to MakeIt Labs!","quiet",true,true)
+      }
+    }()
     f, err := os.Open("speak.cfg")
     decoder := yaml.NewDecoder(f)
     err = decoder.Decode(&cfg)
@@ -359,7 +410,7 @@ func main() {
           fmt.Printf("%s\r\n", "Cannot get request")
             return
         }
-        speak(textout,"")
+        speak(textout,"",false,false)
 
         // Use req to handle request
       fmt.Fprintf(os.Stderr,"CGI Wait done\n")
@@ -368,13 +419,14 @@ func main() {
     
     //log.Printf("Backends",cfg.BottomSpeaks)
     //awscfg, err := config.LoadDefaultConfig(context.TODO())
+
     http.HandleFunc("/hello", hello)
     http.HandleFunc("/headers", headers)
     http.HandleFunc("/slack", slack)
     http.HandleFunc("/bottom", bottom)
 
     log.Println("Listening Port",cfg.Port)
-    speak("Speakbot active","/pa")
+    speak("Welcome to MakeIt Labs!","/silent",true,true)
     go speaker()
     http.ListenAndServe(fmt.Sprintf(":%d",cfg.Port), nil)
 }
