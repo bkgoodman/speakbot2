@@ -57,6 +57,7 @@ type BottomSpeak struct {
    URL string `yaml:"URL"`
    Commands []string `yaml:"Commands"`
 }
+
 type SpeakConfig struct {
    SecretKey string `yaml:"SecretKey"`
    AccessKey string `yaml:"AccessKey"`
@@ -71,6 +72,14 @@ type SpeakConfig struct {
    NotifyChannel string `yaml:"NotifyChannel"`
    Mode string `yaml:"Mode"`
    SpeakHelp string `yaml:"SpeakHelp"`
+
+   /* MQTT */
+   CACert string `yaml:"CACert"`
+   ClientCert string `yaml:"ClientCert"`
+   ClientKey string `yaml:"ClientKey"`
+   ClientID string `yaml:"ClientID"`
+   MqttHost string `yaml:"MqttHost"`
+   MqttPort int `yaml:"MqttPort"`
 }
 
 func hello(w http.ResponseWriter, req *http.Request) {
@@ -348,6 +357,9 @@ func speak(text string,slashcmd string, quiet bool, silent bool) {
           }
         }
     }
+    if (cfg.ClientID != "") {
+      mqtt_publish("speakbot",text)
+    }
      fmt.Fprintf(os.Stderr,"Speak is done\n")
 
     clearDisp.Reset(7200 * time.Second)
@@ -420,6 +432,10 @@ func main() {
     //log.Printf("Backends",cfg.BottomSpeaks)
     //awscfg, err := config.LoadDefaultConfig(context.TODO())
 
+    if (cfg.ClientID != "") {
+      mqtt_init()
+    }
+
     http.HandleFunc("/hello", hello)
     http.HandleFunc("/headers", headers)
     http.HandleFunc("/slack", slack)
@@ -429,4 +445,8 @@ func main() {
     speak("Welcome to MakeIt Labs!","/silent",true,true)
     go speaker()
     http.ListenAndServe(fmt.Sprintf(":%d",cfg.Port), nil)
+
+    if (cfg.ClientID != "") {
+      mqtt_destroy()
+    }
 }
