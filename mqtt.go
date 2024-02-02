@@ -25,13 +25,25 @@ func PingSender() {
 	for {
 		var topic string = fmt.Sprintf("ratt/status/node/%s/ping",cfg.ClientID)
 		var message string = "{\"status\":\"ok\"}"
-		client.Publish(topic,0,false,message)
+    t:= client.Publish(topic,0,false,message)
+    log.Printf("MQTT Publishing \"%s\" topic \"%s\"",message,topic)
+    t.Wait()
+    if (t.Error() != nil) {
+      log.Printf("MQTT publish error to %s: %s",topic,t.Error())
+    }
+    log.Printf("MQTT published %v",t)
 		time.Sleep(120 * time.Second)
 	}
 }
 
 func mqtt_publish(topic string, message string) {
-		client.Publish(topic,0,false,message)
+    log.Printf("MQTT Publishing \"%s\" topic \"%s\"",message,topic)
+    t:= client.Publish(topic,0,false,message)
+    t.Wait()
+    if (t.Error() != nil) {
+      log.Printf("MQTT publish error to %s: %s",topic,t.Error())
+    }
+    log.Printf("MQTT published %v",t)
 }
 
 
