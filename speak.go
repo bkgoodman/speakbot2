@@ -277,18 +277,19 @@ func speak(text string,slashcmd string, quiet bool, silent bool) {
       fmt.Fprintf(os.Stderr,"AWS Polly Load error: %s\n",err)
       log.Fatal(err)
     }
-    fmt.Fprintf(os.Stderr,"Poly1\n")
+    //fmt.Fprintf(os.Stderr,"Poly1\n")
     p := polly.NewFromConfig(awscfg)
 
-    fmt.Fprintf(os.Stderr,"Poly2\n")
+    //fmt.Fprintf(os.Stderr,"Poly2\n")
     //log.Printf("CONFIG is %v+\n",cfg)
     input := &polly.DescribeVoicesInput{LanguageCode: "en-US"}
     _, err = p.DescribeVoices(context.TODO(),input)
     //log.Printf("Poly is %T %v+\n",p,p)
     //log.Printf("DescribeVoices %v is %T %v+\n",err,resp,resp)
 
-    fmt.Fprintf(os.Stderr,"Poly3\n")
+    //fmt.Fprintf(os.Stderr,"Poly3\n")
     t := fmt.Sprintf("<speak><amazon:domain name=\"news\"><prosody volume=\"x-loud\" rate=\"slow\">%s</prosody></amazon:domain></speak>",text)
+    fmt.Fprintf(os.Stderr,"To Poly: %s",t)
     ssin := &polly.SynthesizeSpeechInput{
       OutputFormat: pollytype.OutputFormatPcm,
       LanguageCode: pollytype.LanguageCodeEnUs,
@@ -297,7 +298,7 @@ func speak(text string,slashcmd string, quiet bool, silent bool) {
       Engine: pollytype.EngineNeural,
       Text: &t}
     //log.Printf(t)
-    fmt.Fprintf(os.Stderr,"Synthesizing\n")
+    //fmt.Fprintf(os.Stderr,"Synthesizing\n")
     spout, errout := p.SynthesizeSpeech(context.TODO(),ssin)
     if (errout != nil) {
       fmt.Fprintf(os.Stderr,"AWS Polly error: %s\n",errout)
