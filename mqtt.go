@@ -14,6 +14,8 @@ import (
 
 var client mqtt.Client
 
+
+// This is for ACL updates, which Speakbot doesn't do
 func onMessageReceived(client mqtt.Client, message mqtt.Message) {
 	if (message.Topic() == "ratt/control/broadcast/acl/update") {
 		fmt.Println("Got ACL Update message")
@@ -56,7 +58,11 @@ func mqtt_init() {
 	clientID := cfg.ClientID
 
 	// MQTT topic to subscribe to
-	topic := "#"
+	//topic := "#"
+
+  if ((cfg.ClientCert == "") || (cfg.ClientKey == "") || (cfg.CACert == "")) {
+		log.Fatal("MQTT Client specified, without TLC cert, key and CA")
+  }
 
 	// Load client key pair for TLS (replace with your own paths)
 	cert, err := tls.LoadX509KeyPair(cfg.ClientCert, cfg.ClientKey)
@@ -96,9 +102,9 @@ func mqtt_init() {
 	}
 
 	// Subscribe to the topic
-	if token := client.Subscribe(topic, 0, nil); token.Wait() && token.Error() != nil {
-		log.Fatal("MQTT Subscribe error: ",token.Error())
-	}
+	//if token := client.Subscribe(topic, 0, nil); token.Wait() && token.Error() != nil {
+	//	log.Fatal("MQTT Subscribe error: ",token.Error())
+	//}
 
 	go PingSender()
 	fmt.Printf("Connected to %s\n", broker)

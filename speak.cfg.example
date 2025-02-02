@@ -1,9 +1,31 @@
-SecretKey: "AWSSecretkey"
-AccessKey: "AWSAccessKey
-BotToken: "SlackBotTokenUNUSED"
-Token: "SlakTokenVerificationKey"
-NotifyChannel: "C043C58771D"
+SecretKey: "SECRETKEY"
+AccessKey: "Accesskey"
+BotToken: "xoxb-111111111"
+Token: "SecreToken"
+VerificationKey: "Secret"
+NotifyChannel: C0123456
 Port: 8091
-AlsaDevice: sysdefault:CARD=PCH
-SpamInterval: 10
-SignDevice: /dev/ttyUSB0
+#AlsaDevice: sysdefault:CARD=PCH
+SpamInterval: 60
+Mode: Normal
+
+
+CACert: "certs/ca.crt"
+ClientCert: "certs/client.crt"
+ClientKey: "certs/client.key"
+ClientID: "112233445566"
+MqttHost: "mqtt"
+MqttPort: 8883
+
+BottomSpeaks:
+  - URL: http://speakbot:8090/bottom
+    Commands: ["pa","quiet","silent","allspeak","newspeak","foyerspeak","speakbot","flash"]
+  - URL: http://garagebot:8090/bottom
+    Commands: ["pa","quiet","silent","allspeak","garagespeak","garagebot","flash"]
+SpeakHelp: "`/pa` or `/allspeak` - Announce to All\r
+`/flash` - Quick Message (dissapears)\r
+`/quiet` - Display - but do not read text\r
+`/silent` - Display - Does not read - No alert tone\r
+`/silence` - Inhibit sound for 2 hours\r
+`/speakbot` - Announce to Cleanspace\r
+`/garagebot` - Announce to Garage"

@@ -34,6 +34,7 @@ import (
    "os"
    "os/exec"
    "encoding/base64"
+   "encoding/json"
    "gopkg.in/yaml.v2"
    //"syscall"
 
@@ -359,7 +360,18 @@ func speak(text string,slashcmd string, quiet bool, silent bool) {
         }
     }
     if (cfg.ClientID != "") {
-      mqtt_publish("speakbot",text)
+      payload,err := json.Marshal( 
+        struct {
+          Text string `json:"text,string"`
+        } {
+          Text: text,
+        },
+      )
+      if (err != nil) { 
+        log.Printf("Failed to marshal json: %v",err) 
+      } else {
+        mqtt_publish("speakbot",string(payload))
+      }
     }
      fmt.Fprintf(os.Stderr,"Speak is done\n")
 
