@@ -19,9 +19,9 @@ MqttPort: 8883
 
 BottomSpeaks:
   - URL: http://speakbot:8090/bottom
-    Commands: ["pa","quiet","silent","allspeak","newspeak","foyerspeak","speakbot","flash"]
+    Commands: ["pa","quiet","silent","allspeak","newspeak","foyerspeak","speakbot","flash","clear"]
   - URL: http://garagebot:8090/bottom
-    Commands: ["pa","quiet","silent","allspeak","garagespeak","garagebot","flash"]
+    Commands: ["pa","quiet","silent","allspeak","garagespeak","garagebot","flash","clear"]
 SpeakHelp: "`/pa` or `/allspeak` - Announce to All\r
 `/flash` - Quick Message (dissapears)\r
 `/quiet` - Display - but do not read text\r

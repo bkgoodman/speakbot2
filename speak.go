@@ -234,6 +234,11 @@ func slack(w http.ResponseWriter, req *http.Request) {
       }
 
       if (command[0] == '/') { command = command[1:]}
+      if (command == "clear") {
+        silence = true
+        quiet = true
+        fmt.Fprintf(w,"Clear (no alert tone)\n")
+      }
       if (command == "silent") {
         silence = true
         quiet = false
@@ -326,13 +331,13 @@ func speak(text string,slashcmd string, quiet bool, silent bool) {
       }
     }
 
-    fmt.Fprintf(os.Stderr,"Alphasigning\n")
     if (cfg.SignDevice != "") {
+      fmt.Fprintf(os.Stderr,"Alphasigning\n")
       alphasign(text,cfg.SignDevice)
     }
-    fmt.Fprintf(os.Stderr,"Bottomspeaking\n")
+    //fmt.Fprintf(os.Stderr,"Bottomspeaking\n")
     for _,bs := range cfg.BottomSpeaks {
-        fmt.Fprintf(os.Stderr, "Match attempt: \"%s\"\n",bs)
+        //fmt.Fprintf(os.Stderr, "Match attempt: \"%s\"\n",bs)
         if (slices.Contains(bs.Commands,slashcmd)) {
           fmt.Fprintf(os.Stderr, "Dispatch to Bottom: \"%s\"\n",bs)
           v := url.Values{
@@ -363,14 +368,17 @@ func speak(text string,slashcmd string, quiet bool, silent bool) {
       payload,err := json.Marshal( 
         struct {
           Text string `json:"text,string"`
+          Command string `json:"command,string"`
         } {
           Text: text,
+          Command: slashcmd,
         },
       )
       if (err != nil) { 
         log.Printf("Failed to marshal json: %v",err) 
       } else {
         mqtt_publish("speakbot",string(payload))
+        log.Printf("MQTT Speakbot publish: %s",string(payload)) 
       }
     }
      fmt.Fprintf(os.Stderr,"Speak is done\n")
@@ -400,7 +408,7 @@ func main() {
     go func() {
       for {
         <-clearDisp.C
-        speak("Welcome to MakeIt Labs!","quiet",true,true)
+        speak("Welcome to MakeIt Labs!","/clear",true,true)
       }
     }()
     f, err := os.Open("speak.cfg")
