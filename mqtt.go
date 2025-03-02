@@ -45,7 +45,7 @@ func mqtt_publish(topic string, message string) {
     if (t.Error() != nil) {
       log.Printf("MQTT publish error to %s: %s",topic,t.Error())
     }
-    //log.Printf("MQTT published %v",t)
+    log.Printf("MQTT published %v",t)
 }
 
 

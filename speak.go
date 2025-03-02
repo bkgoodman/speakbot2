@@ -294,28 +294,30 @@ func speak(text string,slashcmd string, quiet bool, silent bool) {
     //log.Printf("DescribeVoices %v is %T %v+\n",err,resp,resp)
 
     //fmt.Fprintf(os.Stderr,"Poly3\n")
-    t := fmt.Sprintf("<speak><amazon:domain name=\"news\"><prosody volume=\"x-loud\" rate=\"slow\">%s</prosody></amazon:domain></speak>",text)
-    fmt.Fprintf(os.Stderr,"To Poly: %s",t)
-    ssin := &polly.SynthesizeSpeechInput{
-      OutputFormat: pollytype.OutputFormatPcm,
-      LanguageCode: pollytype.LanguageCodeEnUs,
-      TextType: pollytype.TextTypeSsml,
-      VoiceId: pollytype.VoiceIdJoanna,
-      Engine: pollytype.EngineNeural,
-      Text: &t}
-    //log.Printf(t)
-    //fmt.Fprintf(os.Stderr,"Synthesizing\n")
-    spout, errout := p.SynthesizeSpeech(context.TODO(),ssin)
-    if (errout != nil) {
-      fmt.Fprintf(os.Stderr,"AWS Polly error: %s\n",errout)
-    }
     pcmdata := new(bytes.Buffer)
-    _,err = pcmdata.ReadFrom(spout.AudioStream)
-    //log.Printf("Poly Read  %d Bytes %s\n",pcmdata.Len())
+    if ((!silent) || (!quiet)) {
+      t := fmt.Sprintf("<speak><amazon:domain name=\"news\"><prosody volume=\"x-loud\" rate=\"slow\">%s</prosody></amazon:domain></speak>",text)
+      fmt.Fprintf(os.Stderr,"To Poly: %s",t)
+      ssin := &polly.SynthesizeSpeechInput{
+        OutputFormat: pollytype.OutputFormatPcm,
+        LanguageCode: pollytype.LanguageCodeEnUs,
+        TextType: pollytype.TextTypeSsml,
+        VoiceId: pollytype.VoiceIdJoanna,
+        Engine: pollytype.EngineNeural,
+        Text: &t}
+      //log.Printf(t)
+      //fmt.Fprintf(os.Stderr,"Synthesizing\n")
+      spout, errout := p.SynthesizeSpeech(context.TODO(),ssin)
+      if (errout != nil) {
+        fmt.Fprintf(os.Stderr,"AWS Polly error: %s\n",errout)
+      }
+      _,err = pcmdata.ReadFrom(spout.AudioStream)
+      //log.Printf("Poly Read  %d Bytes %s\n",pcmdata.Len())
 
 
-    //os.WriteFile("data.pcm", pcmdata.Bytes(), 0644)
-    spout.AudioStream.Close()
+      //os.WriteFile("data.pcm", pcmdata.Bytes(), 0644)
+      spout.AudioStream.Close()
+    }
 
     fmt.Fprintf(os.Stderr,"Aplaying\n")
     if (cfg.AlsaDevice != "") {
@@ -367,8 +369,8 @@ func speak(text string,slashcmd string, quiet bool, silent bool) {
     if (cfg.ClientID != "") {
       payload,err := json.Marshal( 
         struct {
-          Text string `json:"text,string"`
-          Command string `json:"command,string"`
+          Text string `json:"text"`
+          Command string `json:"command"`
         } {
           Text: text,
           Command: slashcmd,

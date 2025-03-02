@@ -12,12 +12,6 @@ speakbotrpi: speak.go
 clean:
 	rm -rf speakbot speakbotrpi *~
 
-.PHONY: updatelocal
-updatelocal: speakbot
-	systemctl stop bkgspeakbot.service
-	cp speakbot /root/speakbot_live/speakbot
-	systemctl start bkgspeakbot.service
-
 .PHONY: remoteinstall
 remoteinstall: speakbotrpi speakbot
 	echo TODO - need to shutdown and restart for this to work
