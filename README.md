@@ -49,3 +49,6 @@ Create your bot in app, and configure as a "Slash Command". Just give it the URL
 `NotifyChannel` is the chanel identifier if you want speak commands logged to a Slack channel
 
 
+# Doorentry
+
+Note the `doorentry` directory. This is a separate script run on `auth` server via `mqtt_daemon` when a new person enters building. `Doorentry` needs to be installed alongside `mqtt_daemon` and has it's own config file. It does n't go through the main CGI hander above, but rather speaks out directly to the individial backends, delivering welcome message and member audio.

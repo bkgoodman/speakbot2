@@ -124,6 +124,7 @@ func bottom(w http.ResponseWriter, req *http.Request) {
       persistText = text
       alphasign(text,cfg.SignDevice)
     }
+    fmt.Fprintf(os.Stderr,"Text \"%s\" quickText \"%s\" persit \"%s\"\n",text,quickText,persistText);
 
     if (len(audio) > 0) {
       ab, err := base64.URLEncoding.DecodeString(audio)
@@ -269,7 +270,7 @@ func slack(w http.ResponseWriter, req *http.Request) {
 // Add the waitgroup before calling!
 func speak(text string,slashcmd string, quiet bool, silent bool) {
 
-    fmt.Fprintf(os.Stderr,"Speaking\n")
+    fmt.Fprintf(os.Stderr,"Speaking Cmd=%s Quiet=%v Silent=%v \"%s\"\n",slashcmd,quiet,silent,text)
     awscfg, err := config.LoadDefaultConfig(context.TODO(),
       // Hard coded credentials.
       config.WithRegion("us-east-1"),
@@ -319,7 +320,6 @@ func speak(text string,slashcmd string, quiet bool, silent bool) {
       spout.AudioStream.Close()
     }
 
-    fmt.Fprintf(os.Stderr,"Aplaying\n")
     if (cfg.AlsaDevice != "") {
       if (!silent) {
         cmd:= exec.Command("aplay", "-D",cfg.AlsaDevice,"prompt.wav")
@@ -327,6 +327,7 @@ func speak(text string,slashcmd string, quiet bool, silent bool) {
       }
 
       if ((!silent) && (!quiet))  {
+        fmt.Fprintf(os.Stderr,"Playing Audio\n")
         cmd := exec.Command("aplay", "-D",cfg.AlsaDevice,"-c","1","-f","S16_LE","-r","16000")
         cmd.Stdin = bytes.NewReader(pcmdata.Bytes())
         cmd.Run()
@@ -334,7 +335,7 @@ func speak(text string,slashcmd string, quiet bool, silent bool) {
     }
 
     if (cfg.SignDevice != "") {
-      fmt.Fprintf(os.Stderr,"Alphasigning\n")
+      fmt.Fprintf(os.Stderr,"Writing to Alphasign\n")
       alphasign(text,cfg.SignDevice)
     }
     //fmt.Fprintf(os.Stderr,"Bottomspeaking\n")
@@ -410,7 +411,8 @@ func main() {
     go func() {
       for {
         <-clearDisp.C
-        speak("Welcome to MakeIt Labs!","/clear",true,true)
+        persistText = "Welcome to MakeIt Labs!"
+        speak(persistText,"/clear",true,true)
       }
     }()
     f, err := os.Open("speak.cfg")

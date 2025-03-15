@@ -39,6 +39,7 @@ import (
   "bytes"
   "os/exec"
   "fmt"
+  "time"
 )
 
 const (
@@ -180,8 +181,10 @@ func alphasign_init(port string) {
 func alphasign(text string,port string) {
 
   alphasign_init(port)
+  time.Sleep(1 * time.Second)
   //fd,err := os.Open("/dev/ttyUSB0")
   fd, err := os.OpenFile("/dev/ttyUSB0", os.O_APPEND|os.O_WRONLY, 0644)
+  time.Sleep(1 * time.Second)
   defer fd.Close()
   if (err != nil) { log.Fatal("Error opening port",err) }
   var packet = ClearMemory()
@@ -211,6 +214,7 @@ func alphasign(text string,port string) {
 
   packet = WriteText(text)
   //log.Printf("WriteText:\n%s",hex.Dump(packet))
+  fmt.Fprintf(os.Stderr,"Alphasign port=%s Text=\"%s\"\n",port,text)
   fd.Write(packet)
   
 }
