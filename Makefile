@@ -27,3 +27,7 @@ remoteinstall: speakbotrpi speakbot
 	scp speakbot bkg@cgimisc:
 	ssh bkg@cgimisc sudo cp speakbot /home/speakbot/speakbot_live/speakbot
 	ssh bkg@cgimisc sudo systemctl start bkgspeakbot.service
+
+	ssh bkg@speakbot2 sudo systemctl stop bkgspeakbot.service
+	scp speakbotrpi bkg@speakbot2:speakbot
+	ssh bkg@speakbot2 sudo systemctl start bkgspeakbot.service

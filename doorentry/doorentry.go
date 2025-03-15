@@ -70,8 +70,8 @@ func main() {
     }
   }
 
-  silentStr  := "False"
-  quietStr  := "False"
+  silentStr  := ""
+  quietStr  := ""
 
   if *silent { silentStr = "True" }
   if *quiet { quietStr = "True" } 

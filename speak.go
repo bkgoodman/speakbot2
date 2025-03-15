@@ -100,7 +100,7 @@ func headers(w http.ResponseWriter, req *http.Request) {
 var cfg SpeakConfig
 var ch = make(chan SpeakRequest,1)
 var clearDisp= time.NewTimer(7200 * time.Second)
-var persistText string = ""
+var persistText string = "Welcome to MakeIt Labs!"
 
 var silenceUntil time.Time = time.Now()
 
@@ -298,7 +298,7 @@ func speak(text string,slashcmd string, quiet bool, silent bool) {
     pcmdata := new(bytes.Buffer)
     if ((!silent) || (!quiet)) {
       t := fmt.Sprintf("<speak><amazon:domain name=\"news\"><prosody volume=\"x-loud\" rate=\"slow\">%s</prosody></amazon:domain></speak>",text)
-      fmt.Fprintf(os.Stderr,"To Poly: %s",t)
+      fmt.Fprintf(os.Stderr,"To Poly: %s\n",t)
       ssin := &polly.SynthesizeSpeechInput{
         OutputFormat: pollytype.OutputFormatPcm,
         LanguageCode: pollytype.LanguageCodeEnUs,
@@ -340,7 +340,7 @@ func speak(text string,slashcmd string, quiet bool, silent bool) {
     }
     //fmt.Fprintf(os.Stderr,"Bottomspeaking\n")
     for _,bs := range cfg.BottomSpeaks {
-        //fmt.Fprintf(os.Stderr, "Match attempt: \"%s\"\n",bs)
+        fmt.Fprintf(os.Stderr, "Match attempt: \"%s\"\n",bs)
         if (slices.Contains(bs.Commands,slashcmd)) {
           fmt.Fprintf(os.Stderr, "Dispatch to Bottom: \"%s\"\n",bs)
           v := url.Values{
@@ -406,8 +406,9 @@ func speaker() {
 
 
 func main() {
+  
 
-
+    fmt.Fprintf(os.Stderr,"Started v1.1.1\n")
     go func() {
       for {
         <-clearDisp.C
@@ -423,6 +424,9 @@ func main() {
     }
 
     fmt.Fprintf(os.Stderr,"Speak log is %v\n",cfg)
+    for i,bs := range cfg.BottomSpeaks {
+      fmt.Fprintf(os.Stderr,"Bottom %d cfg is %v\n",i,bs)
+    }
     if (cfg.Mode == "CGI") {
       // CGI is Depricated due to threading issues??
       fmt.Fprintf(os.Stderr,"CGI Serving\n")
