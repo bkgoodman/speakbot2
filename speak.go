@@ -81,6 +81,8 @@ type SpeakConfig struct {
    ClientID string `yaml:"ClientID"`
    MqttHost string `yaml:"MqttHost"`
    MqttPort int `yaml:"MqttPort"`
+
+   AlphaPipe string `yaml:"AlphaPipe"`
 }
 
 func hello(w http.ResponseWriter, req *http.Request) {
@@ -104,6 +106,22 @@ var persistText string = "Welcome to MakeIt Labs!"
 
 var silenceUntil time.Time = time.Now()
 
+func writeSignPipe(text string, pipe string) {
+    if (pipe == "") {
+            return
+    }
+    f, err := os.OpenFile(pipe, os.O_RDWR, 0644)
+    if (err != nil) {
+      fmt.Fprintf(os.Stderr,"Error opening named Sign pipe: %s\n",err)
+      return
+    }
+    defer f.Close()
+    _,err = f.WriteString(text)
+    if (err != nil) {
+      fmt.Fprintf(os.Stderr,"Error writing toSign pipe: %s\n",err)
+    }
+}
+
 func bottom(w http.ResponseWriter, req *http.Request) {
    if (req.Method == "POST") {
    		if err := req.ParseForm(); err != nil {
@@ -117,13 +135,18 @@ func bottom(w http.ResponseWriter, req *http.Request) {
 		quiet := req.PostFormValue("quiet")
 		silent := req.PostFormValue("silent")
     //log.Printf("Got text: %s\n",text)
-    if ((cfg.SignDevice != "") && (quickText != "")) {
+
+    if (quickText != "") {
+      writeSignPipe(quickText,cfg.AlphaPipe);
       alphasign(quickText,cfg.SignDevice)
     }
-    if (cfg.SignDevice != "" && quickText == "" && text != "") {
+
+    if (quickText == "" && text != "") {
       persistText = text
+      writeSignPipe(text,cfg.AlphaPipe)
       alphasign(text,cfg.SignDevice)
     }
+
     fmt.Fprintf(os.Stderr,"Text \"%s\" quickText \"%s\" persit \"%s\"\n",text,quickText,persistText);
 
     if (len(audio) > 0) {
@@ -143,9 +166,10 @@ func bottom(w http.ResponseWriter, req *http.Request) {
         }
       }
     }
-    if (cfg.SignDevice != "" && quickText != "") {
+    if (quickText != "") {
       time.Sleep(10*time.Second)
       alphasign(persistText,cfg.SignDevice)
+      writeSignPipe(persistText,cfg.AlphaPipe)
     }
     _ = audio
   }
@@ -334,10 +358,10 @@ func speak(text string,slashcmd string, quiet bool, silent bool) {
       }
     }
 
-    if (cfg.SignDevice != "") {
-      fmt.Fprintf(os.Stderr,"Writing to Alphasign\n")
-      alphasign(text,cfg.SignDevice)
-    }
+    fmt.Fprintf(os.Stderr,"Writing to Alphasign\n")
+    alphasign(text,cfg.SignDevice)
+    writeSignPipe(text,cfg.AlphaPipe)
+    
     //fmt.Fprintf(os.Stderr,"Bottomspeaking\n")
     for _,bs := range cfg.BottomSpeaks {
         fmt.Fprintf(os.Stderr, "Match attempt: \"%s\"\n",bs)

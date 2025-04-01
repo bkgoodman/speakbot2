@@ -179,7 +179,9 @@ func alphasign_init(port string) {
 }
 
 func alphasign(text string,port string) {
-
+  if (port == "") {
+          return
+  }
   alphasign_init(port)
   time.Sleep(1 * time.Second)
   //fd,err := os.Open("/dev/ttyUSB0")
